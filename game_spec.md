@@ -1,4 +1,4 @@
-# ゲーム仕様書：Project DECEIVER
+# ゲーム仕様書：Fake Order
 
 ## 概要
 
