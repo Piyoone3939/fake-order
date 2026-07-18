@@ -11,7 +11,7 @@ public class GameManager : MonoBehaviour
 
     [SerializeField] private float preparationDuration = 60f;
     private float preparationTimer;
-    private GamePhase currentPhase = GamePhase.RoleSelection;
+    private GamePhase currentPhase = GamePhase.Title;
     private LocalRole selectedRole = LocalRole.None;
 
     private SpyController spyController;
@@ -25,6 +25,7 @@ public class GameManager : MonoBehaviour
 
     public enum GamePhase
     {
+        Title,
         RoleSelection,
         Preparation,
         Playing,
@@ -57,7 +58,8 @@ public class GameManager : MonoBehaviour
     private void Update()
     {
         var keyboard = Keyboard.current;
-        if (currentPhase != GamePhase.RoleSelection && keyboard != null && keyboard.f1Key.wasPressedThisFrame)
+        if (currentPhase != GamePhase.Title && currentPhase != GamePhase.RoleSelection &&
+            keyboard != null && keyboard.f1Key.wasPressedThisFrame)
         {
             EnterRoleSelection();
             return;
@@ -65,6 +67,8 @@ public class GameManager : MonoBehaviour
 
         switch (currentPhase)
         {
+            case GamePhase.Title:
+                break;
             case GamePhase.RoleSelection:
                 break;
             case GamePhase.Preparation:
@@ -89,7 +93,30 @@ public class GameManager : MonoBehaviour
         suspicionGauge = FindAnyObjectByType<SuspicionGauge>();
         informationFreshness = FindAnyObjectByType<InformationFreshness>();
 
-        EnterRoleSelection();
+        EnterTitle();
+    }
+
+    private void EnterTitle()
+    {
+        currentPhase = GamePhase.Title;
+        selectedRole = LocalRole.None;
+        if (gameState != null)
+            gameState.IsGameActive = false;
+
+        SetRoleControls(false);
+        SetCanvasVisible(spyUI, false);
+        SetCanvasVisible(organizerUI, false);
+
+        if (roleSelectionUI != null)
+            roleSelectionUI.ShowTitle();
+        else
+            EnterRoleSelection();
+    }
+
+    public void OpenRoleSelection()
+    {
+        if (currentPhase == GamePhase.Title)
+            EnterRoleSelection();
     }
 
     private void EnterRoleSelection()

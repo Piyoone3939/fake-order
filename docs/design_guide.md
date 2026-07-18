@@ -170,6 +170,15 @@ ORDER 03-184
 
 `AUTHORIZED` スタンプはロゴそのものに重ねず、ロゴの余白外に独立した演出として配置します。
 
+### Unity UIタイトル版
+
+- タイトルロゴは `Assets/UI/Logo/FakeOrderLogo.png` の透過Spriteをそのまま使用する
+- TextMeshPro、LineRenderer、UI図形、3Dパーツでロゴを再構成しない
+- グリッチ、スキャンライン、発光、フェードは `LogoRoot` の別レイヤーで重ねる
+- 1920×1080を基準に `LogoRoot` を1600×533、中央アンカーとし、縦横比を変更しない
+- 原画の2172px幅をインポート時に縮小しないよう、Max Sizeは4096、圧縮はNoneとする
+- 小さな文字のカクつきを抑えるため、Screen Space CanvasはPixel Perfectを有効にする
+
 ### キャッチコピー案
 
 

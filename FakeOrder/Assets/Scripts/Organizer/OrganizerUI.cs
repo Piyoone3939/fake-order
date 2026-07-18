@@ -28,6 +28,10 @@ public class OrganizerUI : MonoBehaviour
 
     private void Awake()
     {
+        Canvas canvas = GetComponent<Canvas>();
+        if (canvas != null)
+            canvas.pixelPerfect = true;
+
         defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
         BuildMapPanel();
@@ -73,7 +77,7 @@ public class OrganizerUI : MonoBehaviour
         var rt = CreateUIObject(name, parent);
         var text = rt.gameObject.AddComponent<Text>();
         text.font = defaultFont;
-        text.fontSize = fontSize;
+        text.fontSize = Mathf.RoundToInt(fontSize * 1.18f);
         text.alignment = anchor;
         text.color = color;
         text.text = content;
@@ -310,7 +314,7 @@ public class CameraFeedCellUI : MonoBehaviour
         labelRt.offsetMax = Vector2.zero;
         var labelText = labelRt.gameObject.AddComponent<Text>();
         labelText.font = font;
-        labelText.fontSize = 13;
+        labelText.fontSize = 16;
         labelText.alignment = TextAnchor.MiddleCenter;
         labelText.color = Color.white;
         cell.labelText = labelText;
@@ -323,7 +327,7 @@ public class CameraFeedCellUI : MonoBehaviour
         tsRt.offsetMax = Vector2.zero;
         var timestampText = tsRt.gameObject.AddComponent<Text>();
         timestampText.font = font;
-        timestampText.fontSize = 11;
+        timestampText.fontSize = 14;
         timestampText.alignment = TextAnchor.MiddleCenter;
         timestampText.color = new Color(0.8f, 0.8f, 0.8f);
         cell.timestampText = timestampText;

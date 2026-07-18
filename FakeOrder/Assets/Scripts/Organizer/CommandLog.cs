@@ -231,7 +231,7 @@ public class CommandLog : MonoBehaviour
         var rt = CreateUIObject(name, parent);
         var text = rt.gameObject.AddComponent<Text>();
         text.font = defaultFont;
-        text.fontSize = fontSize;
+        text.fontSize = Mathf.RoundToInt(fontSize * 1.18f);
         text.alignment = anchor;
         text.color = color;
         text.text = content;
@@ -336,7 +336,7 @@ public class CommandLogRowUI : MonoBehaviour
         textRt.offsetMax = new Vector2(-10, 0);
         var text = textRt.gameObject.AddComponent<Text>();
         text.font = font;
-        text.fontSize = 14;
+        text.fontSize = 17;
         text.alignment = TextAnchor.MiddleLeft;
         text.color = Color.white;
         row.lineText = text;

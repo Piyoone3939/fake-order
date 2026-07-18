@@ -15,6 +15,7 @@ public class GamePrototypeSetup : MonoBehaviour
         // 既に編集モードで配置済みなら、Play開始時には何も作り直さない。
         if (Application.isPlaying && !sceneObjectsGenerated)
             BakeSceneObjects();
+
     }
 
 #if UNITY_EDITOR
@@ -24,7 +25,9 @@ public class GamePrototypeSetup : MonoBehaviour
         if (!Application.isPlaying && !sceneObjectsGenerated)
             BakeSceneObjects();
         else if (!Application.isPlaying)
+        {
             EnsureRoleSelectionObjects();
+        }
     }
 #endif
 
@@ -87,16 +90,16 @@ public class GamePrototypeSetup : MonoBehaviour
         // 3. Organizer ビュー（俯瞰マップ）をセットアップ
         CreateOrganizerView();
 
-        // 4. ロール選択画面
+        // 4. ロール選択画面（タイトルロゴを含む）
         CreateRoleSelectionObjects();
         
-        // 5. 基本施設オブジェクト
+        // 6. 基本施設オブジェクト
         CreateFacilityLayout();
         
-        // 6. テスト用情報端末を配置
+        // 7. テスト用情報端末を配置
         CreateTestTerminals();
         
-        // 7. 脱出ポイント
+        // 8. 脱出ポイント
         CreateExitPoint();
         
         Debug.Log("✅ GamePrototype scene setup complete!");
@@ -117,10 +120,13 @@ public class GamePrototypeSetup : MonoBehaviour
         Canvas roleCanvas = roleUIGO.AddComponent<Canvas>();
         roleCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
         roleCanvas.sortingOrder = 100;
+        roleCanvas.pixelPerfect = true;
 
         var scaler = roleUIGO.AddComponent<UnityEngine.UI.CanvasScaler>();
         scaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920, 1080);
+        scaler.screenMatchMode = UnityEngine.UI.CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.5f;
         roleUIGO.AddComponent<UnityEngine.UI.GraphicRaycaster>();
         roleUIGO.AddComponent<RoleSelectionUI>();
 
@@ -174,6 +180,7 @@ public class GamePrototypeSetup : MonoBehaviour
         GameObject spyUIGO = new GameObject("SpyUI");
         var spyUICanvas = spyUIGO.AddComponent<Canvas>();
         spyUICanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        spyUICanvas.pixelPerfect = true;
         var spyUIScaler = spyUIGO.AddComponent<UnityEngine.UI.CanvasScaler>();
         spyUIScaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
         spyUIScaler.referenceResolution = new Vector2(1920, 1080);
@@ -225,6 +232,7 @@ public class GamePrototypeSetup : MonoBehaviour
         GameObject organizerUIGO = new GameObject("OrganizerUI");
         var organizerUICanvas = organizerUIGO.AddComponent<Canvas>();
         organizerUICanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        organizerUICanvas.pixelPerfect = true;
         var organizerUIScaler = organizerUIGO.AddComponent<UnityEngine.UI.CanvasScaler>();
         organizerUIScaler.uiScaleMode = UnityEngine.UI.CanvasScaler.ScaleMode.ScaleWithScreenSize;
         organizerUIScaler.referenceResolution = new Vector2(1920, 1080);

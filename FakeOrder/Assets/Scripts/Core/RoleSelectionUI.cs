@@ -7,11 +7,17 @@ using UnityEngine.UI;
 /// </summary>
 public class RoleSelectionUI : MonoBehaviour
 {
+    [SerializeField] private Sprite titleLogoSprite;
+
     private Font defaultFont;
+    private GameObject titlePanel;
     private GameObject selectionPanel;
     private GameObject statusPanel;
     private Text statusText;
     private bool isSelecting;
+    private bool isShowingTitle;
+    private bool isTitleTransitioning;
+    private TitleLogoEffects titleLogoEffects;
     private RectTransform spyButtonRect;
     private RectTransform organizerButtonRect;
 
@@ -23,6 +29,27 @@ public class RoleSelectionUI : MonoBehaviour
 
     private void Update()
     {
+        if (isShowingTitle)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+
+            var titleKeyboard = Keyboard.current;
+            var titleMouse = Mouse.current;
+            bool enterPressed = titleKeyboard != null &&
+                (titleKeyboard.enterKey.wasPressedThisFrame || titleKeyboard.numpadEnterKey.wasPressedThisFrame);
+            bool clicked = titleMouse != null && titleMouse.leftButton.wasPressedThisFrame;
+            if (!isTitleTransitioning && (enterPressed || clicked))
+            {
+                isTitleTransitioning = true;
+                if (titleLogoEffects != null)
+                    titleLogoEffects.PlayExit(() => GameManager.Instance?.OpenRoleSelection());
+                else
+                    GameManager.Instance?.OpenRoleSelection();
+            }
+            return;
+        }
+
         if (!isSelecting) return;
 
         Cursor.lockState = CursorLockMode.None;
@@ -50,9 +77,25 @@ public class RoleSelectionUI : MonoBehaviour
 
     public void ShowSelection()
     {
+        isShowingTitle = false;
+        isTitleTransitioning = false;
+        titlePanel?.SetActive(false);
         isSelecting = true;
         selectionPanel?.SetActive(true);
         statusPanel?.SetActive(false);
+    }
+
+    public void ShowTitle()
+    {
+        isShowingTitle = true;
+        isTitleTransitioning = false;
+        isSelecting = false;
+        titlePanel?.SetActive(true);
+        selectionPanel?.SetActive(false);
+        statusPanel?.SetActive(false);
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        titleLogoEffects?.ResetPresentation();
     }
 
     public void HideSelection()
@@ -79,6 +122,8 @@ public class RoleSelectionUI : MonoBehaviour
 
     public void ShowResult(GameResult result)
     {
+        isShowingTitle = false;
+        titlePanel?.SetActive(false);
         isSelecting = false;
         selectionPanel?.SetActive(false);
         statusPanel?.SetActive(true);
@@ -100,15 +145,52 @@ public class RoleSelectionUI : MonoBehaviour
     {
         Canvas canvas = GetComponent<Canvas>();
         if (canvas != null)
+        {
             canvas.sortingOrder = 100;
+            canvas.pixelPerfect = true;
+        }
+
+        titlePanel = CreatePanel("TitlePanel", transform, new Color(0.957f, 0.953f, 0.933f, 1f));
+        Image titlePanelImage = titlePanel.GetComponent<Image>();
+        titlePanelImage.raycastTarget = false;
+
+        GameObject logoRootObject = new GameObject("LogoRoot", typeof(RectTransform), typeof(CanvasGroup));
+        logoRootObject.transform.SetParent(titlePanel.transform, false);
+        RectTransform logoRoot = logoRootObject.GetComponent<RectTransform>();
+        logoRoot.anchorMin = new Vector2(0.5f, 0.5f);
+        logoRoot.anchorMax = new Vector2(0.5f, 0.5f);
+        logoRoot.pivot = new Vector2(0.5f, 0.5f);
+        logoRoot.anchoredPosition = new Vector2(0f, 45f);
+        logoRoot.sizeDelta = new Vector2(1600f, 533f);
+
+        GameObject logoObject = new GameObject("LogoImage", typeof(RectTransform), typeof(Image));
+        logoObject.transform.SetParent(logoRoot, false);
+        RectTransform logoRect = logoObject.GetComponent<RectTransform>();
+        SetRect(logoRect, Vector2.zero, Vector2.one);
+        Image logoImage = logoObject.GetComponent<Image>();
+        logoImage.sprite = titleLogoSprite;
+        logoImage.type = Image.Type.Simple;
+        logoImage.preserveAspect = true;
+        logoImage.raycastTarget = false;
+
+        titleLogoEffects = logoRootObject.AddComponent<TitleLogoEffects>();
+        titleLogoEffects.Configure(logoRoot, logoImage);
+
+        Text tagline = CreateText("Tagline", titlePanel.transform,
+            "その情報は、いつの真実だ。", 34, TextAnchor.MiddleCenter, new Color(0.15f, 0.2f, 0.23f));
+        SetRect(tagline.rectTransform, new Vector2(0.24f, 0.14f), new Vector2(0.76f, 0.21f));
+
+        Text startPrompt = CreateText("StartPrompt", titlePanel.transform,
+            "[ ENTER ]  START", 30, TextAnchor.MiddleCenter, new Color(0.1f, 0.45f, 0.91f));
+        SetRect(startPrompt.rectTransform, new Vector2(0.3f, 0.07f), new Vector2(0.7f, 0.14f));
 
         selectionPanel = CreatePanel("RoleSelectionPanel", transform, new Color(0.03f, 0.05f, 0.09f, 0.96f));
 
-        Text title = CreateText("Title", selectionPanel.transform, "FAKE ORDER", 46, TextAnchor.MiddleCenter, Color.white);
+        Text title = CreateText("Title", selectionPanel.transform, "FAKE ORDER", 58, TextAnchor.MiddleCenter, Color.white);
         SetRect(title.rectTransform, new Vector2(0.2f, 0.68f), new Vector2(0.8f, 0.84f));
 
         Text description = CreateText("Description", selectionPanel.transform,
-            "操作するロールを選択してください", 24, TextAnchor.MiddleCenter, new Color(0.75f, 0.85f, 1f));
+            "操作するロールを選択してください", 30, TextAnchor.MiddleCenter, new Color(0.75f, 0.85f, 1f));
         SetRect(description.rectTransform, new Vector2(0.2f, 0.57f), new Vector2(0.8f, 0.68f));
 
         Button spyButton = CreateButton("SpyButton", selectionPanel.transform,
@@ -124,7 +206,7 @@ public class RoleSelectionUI : MonoBehaviour
         organizerButton.onClick.AddListener(() => SelectRole(GameManager.LocalRole.Organizer));
 
         Text hint = CreateText("Hint", selectionPanel.transform,
-            "ボタンをクリック、または数字キーで選択", 18, TextAnchor.MiddleCenter, Color.gray);
+            "ボタンをクリック、または数字キーで選択", 24, TextAnchor.MiddleCenter, Color.gray);
         SetRect(hint.rectTransform, new Vector2(0.2f, 0.2f), new Vector2(0.8f, 0.29f));
 
         statusPanel = CreatePanel("PhaseStatusPanel", transform, new Color(0f, 0f, 0f, 0.72f));
@@ -134,8 +216,10 @@ public class RoleSelectionUI : MonoBehaviour
         statusRect.offsetMin = Vector2.zero;
         statusRect.offsetMax = Vector2.zero;
 
-        statusText = CreateText("StatusText", statusPanel.transform, "", 20, TextAnchor.MiddleCenter, Color.white);
+        statusText = CreateText("StatusText", statusPanel.transform, "", 26, TextAnchor.MiddleCenter, Color.white);
         SetRect(statusText.rectTransform, Vector2.zero, Vector2.one);
+        titlePanel.SetActive(false);
+        selectionPanel.SetActive(false);
         statusPanel.SetActive(false);
     }
 
@@ -179,7 +263,7 @@ public class RoleSelectionUI : MonoBehaviour
         colors.pressedColor = Color.Lerp(color, Color.black, 0.2f);
         button.colors = colors;
 
-        Text text = CreateText("Label", go.transform, label, 24, TextAnchor.MiddleCenter, Color.white);
+        Text text = CreateText("Label", go.transform, label, 30, TextAnchor.MiddleCenter, Color.white);
         SetRect(text.rectTransform, Vector2.zero, Vector2.one);
         return button;
     }

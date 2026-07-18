@@ -46,6 +46,10 @@ public class SpyUI : MonoBehaviour
 
     private void Awake()
     {
+        Canvas canvas = GetComponent<Canvas>();
+        if (canvas != null)
+            canvas.pixelPerfect = true;
+
         defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
         BuildInformationPanel();
@@ -102,7 +106,7 @@ public class SpyUI : MonoBehaviour
         var rt = CreateUIObject(name, parent);
         var text = rt.gameObject.AddComponent<Text>();
         text.font = defaultFont;
-        text.fontSize = fontSize;
+        text.fontSize = Mathf.RoundToInt(fontSize * 1.18f);
         text.alignment = anchor;
         text.color = color;
         text.text = content;
@@ -530,7 +534,7 @@ public class InformationUIItem : MonoBehaviour
         textRt.offsetMax = new Vector2(-6, 0);
         var text = textRt.gameObject.AddComponent<Text>();
         text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        text.fontSize = 15;
+        text.fontSize = 18;
         text.alignment = TextAnchor.MiddleLeft;
         text.color = Color.white;
         item.infoText = text;
