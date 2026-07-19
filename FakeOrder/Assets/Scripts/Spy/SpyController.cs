@@ -25,6 +25,7 @@ public class SpyController : MonoBehaviour
     private float xRotation = 0f;
     private bool isMoving = false;
     private bool isSprinting = false;
+    private bool isPerformingSuspiciousAction = false;
     private bool inputEnabled = false;
     private SpyUI spyUI;
     private IInteractable currentLookTarget;
@@ -164,9 +165,30 @@ public class SpyController : MonoBehaviour
         return transform.position;
     }
 
+    public void TeleportTo(Vector3 destination)
+    {
+        bool wasEnabled = characterController != null && characterController.enabled;
+        if (characterController != null)
+            characterController.enabled = false;
+        transform.position = destination;
+        velocity = Vector3.zero;
+        if (characterController != null)
+            characterController.enabled = wasEnabled;
+    }
+
     public bool IsSprinting()
     {
         return isSprinting;
+    }
+
+    public bool IsPerformingSuspiciousAction()
+    {
+        return isPerformingSuspiciousAction;
+    }
+
+    public void SetSuspiciousAction(bool active)
+    {
+        isPerformingSuspiciousAction = active;
     }
 
     public void SetControlEnabled(bool enabled)
@@ -178,6 +200,7 @@ public class SpyController : MonoBehaviour
             moveInput = Vector2.zero;
             isMoving = false;
             isSprinting = false;
+            isPerformingSuspiciousAction = false;
             currentLookTarget = null;
             spyUI?.ClearInteractionPrompt();
         }

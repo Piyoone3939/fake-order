@@ -119,7 +119,9 @@ public class SuspicionGauge : MonoBehaviour
     private void TriggerSuspicionAlert()
     {
         Debug.Log("⚠️ SUSPICION ALERT: 100%に達しました！");
-        // オーガナイザー側に通知を送る
+        if (GameManager.Instance != null &&
+            GameManager.Instance.GetCurrentPhase() == GameManager.GamePhase.Playing)
+            GameManager.Instance.EndGame(GameResult.SpyEliminated);
     }
 
     public float GetCurrentSuspicion()

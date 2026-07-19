@@ -10,6 +10,9 @@ using System.Collections.Generic;
 /// </summary>
 public class CommandLog : MonoBehaviour
 {
+    public static event System.Action<CommandType, Vector3> ForgedCommandIssued;
+    public static event System.Action<CommandType, Vector3> ForgedCommandInvalidated;
+
     [System.Serializable]
     public class CommandEntry
     {
@@ -78,6 +81,7 @@ public class CommandLog : MonoBehaviour
         }
 
         AddCommandEntry(commandType, location);
+        ForgedCommandIssued?.Invoke(commandType, location);
 
         areaForgeCounts.TryGetValue(areaName, out int count);
         count++;
@@ -122,6 +126,7 @@ public class CommandLog : MonoBehaviour
 
         entries[entryIndex].isInvalidated = true;
         areaLockedUntil[entries[entryIndex].locationName] = Time.time + areaLockDuration;
+        ForgedCommandInvalidated?.Invoke(entries[entryIndex].commandType, entries[entryIndex].location);
         UpdateLogDisplay();
         Debug.Log($"✓ Command invalidated: {entries[entryIndex].commandType}");
     }
@@ -143,6 +148,17 @@ public class CommandLog : MonoBehaviour
         }
 
         organizerController?.NotifySpyLogAccess(isDisplaying);
+    }
+
+    public void CloseDisplay()
+    {
+        if (!isDisplaying)
+            return;
+
+        isDisplaying = false;
+        logRootPanel.SetActive(false);
+        CancelHold();
+        organizerController?.NotifySpyLogAccess(false);
     }
 
     // ================= 選択 / 長押し無効化 =================
@@ -198,6 +214,7 @@ public class CommandLog : MonoBehaviour
         var entry = entries[index];
         entry.isInvalidated = true;
         areaLockedUntil[entry.locationName] = Time.time + areaLockDuration;
+        ForgedCommandInvalidated?.Invoke(entry.commandType, entry.location);
         UpdateLogDisplay();
         organizerController?.OnCommandInvalidated(entry);
     }

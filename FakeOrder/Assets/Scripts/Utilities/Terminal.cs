@@ -120,6 +120,7 @@ public class Terminal : MonoBehaviour, IInteractable
     {
         isBeingHacked = true;
         hackingProgress = 0f;
+        currentSpyController?.SetSuspiciousAction(true);
 
         string label = pendingAction == PendingAction.Forge
             ? $"端末 #{terminalId} 命令書偽造中..."
@@ -133,6 +134,7 @@ public class Terminal : MonoBehaviour, IInteractable
     {
         isBeingHacked = false;
         hackingProgress = 0f;
+        currentSpyController?.SetSuspiciousAction(false);
         currentSpyController = null;
         spyUI?.ShowHackingProgress(false);
 
@@ -144,6 +146,7 @@ public class Terminal : MonoBehaviour, IInteractable
         isBeingHacked = false;
         hackingProgress = 0f;
         spyUI?.ShowHackingProgress(false);
+        currentSpyController?.SetSuspiciousAction(false);
 
         if (pendingAction == PendingAction.Forge)
         {

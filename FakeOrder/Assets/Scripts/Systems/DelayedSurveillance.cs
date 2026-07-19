@@ -22,6 +22,7 @@ public class DelayedSurveillance : MonoBehaviour
 
         [System.NonSerialized] public RenderTexture[] ringBuffer;
         [System.NonSerialized] public float[] captureTimestamps;
+        [System.NonSerialized] public bool[] spyPresentAtCapture;
         [System.NonSerialized] public int writeIndex;
         [System.NonSerialized] public int filledCount;
         [System.NonSerialized] public float captureTimer;
@@ -29,9 +30,11 @@ public class DelayedSurveillance : MonoBehaviour
 
     [SerializeField] private List<CameraArea> cameraAreas = new List<CameraArea>();
     [SerializeField] private float snapshotInterval = 0.5f;
+    private SpyController trackedSpy;
 
     public void Initialize()
     {
+        trackedSpy = FindAnyObjectByType<SpyController>(FindObjectsInactive.Include);
         foreach (var area in cameraAreas)
         {
             if (area.liveRenderTexture == null) continue;
@@ -39,6 +42,7 @@ public class DelayedSurveillance : MonoBehaviour
             int slotCount = Mathf.Max(1, Mathf.CeilToInt(area.delayTime / snapshotInterval) + 1);
             area.ringBuffer = new RenderTexture[slotCount];
             area.captureTimestamps = new float[slotCount];
+            area.spyPresentAtCapture = new bool[slotCount];
 
             var desc = area.liveRenderTexture.descriptor;
             desc.depthBufferBits = 0; // 表示専用のコピー先なのでdepthは不要（メモリ削減）
@@ -76,6 +80,8 @@ public class DelayedSurveillance : MonoBehaviour
     {
         Graphics.CopyTexture(area.liveRenderTexture, area.ringBuffer[area.writeIndex]);
         area.captureTimestamps[area.writeIndex] = Time.time;
+        area.spyPresentAtCapture[area.writeIndex] = trackedSpy != null &&
+            IsPositionInsideArea(area, trackedSpy.transform.position);
 
         area.writeIndex = (area.writeIndex + 1) % area.ringBuffer.Length;
         area.filledCount = Mathf.Min(area.filledCount + 1, area.ringBuffer.Length);
@@ -106,6 +112,29 @@ public class DelayedSurveillance : MonoBehaviour
         return area.captureTimestamps[ComputeReadIndex(area)];
     }
 
+    public bool WasSpyPresentInDelayedFrame(int areaIndex)
+    {
+        if (areaIndex < 0 || areaIndex >= cameraAreas.Count) return false;
+        CameraArea area = cameraAreas[areaIndex];
+        if (area.ringBuffer == null || area.spyPresentAtCapture == null || area.filledCount == 0) return false;
+        return area.spyPresentAtCapture[ComputeReadIndex(area)];
+    }
+
+    public bool IsPositionInsideArea(int areaIndex, Vector3 worldPosition)
+    {
+        return areaIndex >= 0 && areaIndex < cameraAreas.Count &&
+            IsPositionInsideArea(cameraAreas[areaIndex], worldPosition);
+    }
+
+    private static bool IsPositionInsideArea(CameraArea area, Vector3 worldPosition)
+    {
+        if (Mathf.Abs(worldPosition.y - area.areaCenter.y) > 2.5f)
+            return false;
+        float dx = worldPosition.x - area.areaCenter.x;
+        float dz = worldPosition.z - area.areaCenter.z;
+        return dx * dx + dz * dz <= area.areaRadius * area.areaRadius;
+    }
+
     public string GetAreaInfo(int areaIndex)
     {
         if (areaIndex >= 0 && areaIndex < cameraAreas.Count)
@@ -123,6 +152,8 @@ public class DelayedSurveillance : MonoBehaviour
     {
         foreach (var area in cameraAreas)
         {
+            if (Mathf.Abs(worldPos.y - area.areaCenter.y) > 2.5f)
+                continue;
             float dx = worldPos.x - area.areaCenter.x;
             float dz = worldPos.z - area.areaCenter.z;
             if (dx * dx + dz * dz <= area.areaRadius * area.areaRadius)
@@ -141,12 +172,23 @@ public class DelayedSurveillance : MonoBehaviour
         cameraAreas.Add(area);
     }
 
+    public void ClearCameraAreas()
+    {
+        ReleaseBuffers();
+        cameraAreas.Clear();
+    }
+
     public int GetCameraCount()
     {
         return cameraAreas.Count;
     }
 
     private void OnDestroy()
+    {
+        ReleaseBuffers();
+    }
+
+    private void ReleaseBuffers()
     {
         foreach (var area in cameraAreas)
         {
@@ -156,9 +198,15 @@ public class DelayedSurveillance : MonoBehaviour
                 if (rt != null)
                 {
                     rt.Release();
-                    Destroy(rt);
+                    if (Application.isPlaying)
+                        Destroy(rt);
+                    else
+                        DestroyImmediate(rt);
                 }
             }
+            area.ringBuffer = null;
+            area.captureTimestamps = null;
+            area.spyPresentAtCapture = null;
         }
     }
 }
