@@ -24,6 +24,7 @@ public class SuspicionGauge : MonoBehaviour
     private float lastSuspicionDecayTime;
     private SpyController spyController;
     private SpyUI spyUI;
+    private OfficeNpcController[] officeNpcs;
     private bool wasRunning = false;
     private bool alertTriggered = false;
 
@@ -31,6 +32,7 @@ public class SuspicionGauge : MonoBehaviour
     {
         spyController = GetComponent<SpyController>();
         spyUI = FindAnyObjectByType<SpyUI>();
+        officeNpcs = FindObjectsByType<OfficeNpcController>(FindObjectsInactive.Include);
         lastSuspicionDecayTime = Time.time;
     }
 
@@ -109,11 +111,31 @@ public class SuspicionGauge : MonoBehaviour
     private void ApplySuspicionDecay()
     {
         float decay = decayRate;
-        
-        // NPCに近い場合や安全な場所にいる場合は減衰を加速
-        // (実装は別途)
+
+        // 社員と同じ速度で集団に混ざっている間は、自然減衰を加速する。
+        if (spyController != null && spyController.IsBlendingWalk() && IsNearEmployee())
+            decay += 1.5f;
 
         DecreaseSuspicion(decay);
+    }
+
+    private bool IsNearEmployee()
+    {
+        if (officeNpcs == null || officeNpcs.Length == 0)
+            officeNpcs = FindObjectsByType<OfficeNpcController>(FindObjectsInactive.Include);
+
+        Vector3 spyPosition = transform.position;
+        foreach (OfficeNpcController npc in officeNpcs)
+        {
+            if (npc == null || npc.GetNpcRole() != OfficeNpcController.NpcRole.Employee ||
+                Mathf.Abs(npc.transform.position.y - spyPosition.y) > 2.5f)
+                continue;
+            Vector3 delta = npc.transform.position - spyPosition;
+            delta.y = 0f;
+            if (delta.sqrMagnitude <= 9f)
+                return true;
+        }
+        return false;
     }
 
     private void TriggerSuspicionAlert()

@@ -12,6 +12,7 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public static class FacilityLayoutEditorUtility
 {
+    private const string SpyBotPlayValidationKey = "FakeOrder.SpyBotPlayValidation";
     private const string PrototypeScenePath = "Assets/Scenes/GamePrototype.unity";
     private const string NavigationFolder = "Assets/Navigation";
     private static readonly string[] FloorObjectNames =
@@ -57,6 +58,20 @@ public static class FacilityLayoutEditorUtility
                 CaptureCamera(managementCamera, previewPath);
                 Debug.Log($"Management room preview captured: {previewPath}");
             }
+        };
+    }
+
+    [InitializeOnLoadMethod]
+    private static void ResumeSpyBotPlayValidation()
+    {
+        if (!SessionState.GetBool(SpyBotPlayValidationKey, false))
+            return;
+        EditorApplication.delayCall += () =>
+        {
+            if (!EditorApplication.isPlaying)
+                return;
+            EditorApplication.update -= MonitorSpyBotPlayValidation;
+            EditorApplication.update += MonitorSpyBotPlayValidation;
         };
     }
 
@@ -107,6 +122,26 @@ public static class FacilityLayoutEditorUtility
             ForceReserializeAssetsOptions.ReserializeAssetsAndMetadata);
         CaptureCameraPreviews();
         Debug.Log("Three-floor facility layout rebuilt and saved.");
+    }
+
+    public static void VerifySpyBotPlayModeForCommandLine()
+    {
+        EditorSceneManager.OpenScene(PrototypeScenePath, OpenSceneMode.Single);
+        SessionState.SetBool(SpyBotPlayValidationKey, true);
+        EditorApplication.isPlaying = true;
+    }
+
+    private static void MonitorSpyBotPlayValidation()
+    {
+        if (!EditorApplication.isPlaying)
+            return;
+
+        if (Object.FindAnyObjectByType<GameManager>() == null ||
+            Object.FindAnyObjectByType<SpyBotController>() == null)
+            return;
+        EditorApplication.update -= MonitorSpyBotPlayValidation;
+        SessionState.SetBool(SpyBotPlayValidationKey, false);
+        new GameObject("SpyBotPlayModeProbe").AddComponent<SpyBotPlayModeProbe>();
     }
 
     private static void ValidateInteractiveOrganizerRoom()
@@ -162,12 +197,17 @@ public static class FacilityLayoutEditorUtility
         DelayedSurveillance surveillance = Object.FindAnyObjectByType<DelayedSurveillance>(FindObjectsInactive.Include);
         Terminal[] terminals = Object.FindObjectsByType<Terminal>(FindObjectsInactive.Include);
         OfficeNpcController[] npcs = Object.FindObjectsByType<OfficeNpcController>(FindObjectsInactive.Include);
+        RoutineActivityPoint[] routinePoints = Object.FindObjectsByType<RoutineActivityPoint>(FindObjectsInactive.Include);
+        SpyController spy = Object.FindAnyObjectByType<SpyController>(FindObjectsInactive.Include);
+        SpyDisguiseController disguise = spy != null ? spy.GetComponent<SpyDisguiseController>() : null;
+        SpyBotController spyBot = spy != null ? spy.GetComponent<SpyBotController>() : null;
         GameObject firstFloor = GameObject.Find("Floor_1_GENERAL_FLOOR");
         Camera mapCamera = GameObject.Find("MapCamera")?.GetComponent<Camera>();
         GameObject firstFloorSlab = GameObject.Find("1F_Slab");
         int bluffComputerCount = 0;
         int[] employeeCounts = new int[3];
         int[] guardCounts = new int[3];
+        var employeeAppearanceVariants = new HashSet<int>();
         foreach (Transform item in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include))
         {
             if (item.name.StartsWith("BluffComputer_"))
@@ -179,7 +219,10 @@ public static class FacilityLayoutEditorUtility
             if (npc.GetNpcRole() == OfficeNpcController.NpcRole.SecurityGuard)
                 guardCounts[floorIndex]++;
             else
+            {
                 employeeCounts[floorIndex]++;
+                employeeAppearanceVariants.Add(npc.GetAppearanceVariant());
+            }
 
             Vector3 sameFloorCommand = new Vector3(0f, floorIndex * 5f + 0.6f, 0f);
             Vector3 otherFloorCommand = new Vector3(0f, ((floorIndex + 1) % 3) * 5f + 0.6f, 0f);
@@ -214,6 +257,17 @@ public static class FacilityLayoutEditorUtility
             throw new MissingComponentException("The enlarged office floor was not generated.");
         if (bluffComputerCount < 40)
             throw new MissingComponentException($"Expected at least 40 bluff computers, found {bluffComputerCount}.");
+        if (routinePoints.Length < bluffComputerCount + 1 ||
+            !System.Array.Exists(routinePoints, point => point.GetActivityType() == RoutineActivityType.Break))
+            throw new MissingComponentException("Workstation and break-room routine activities were not generated.");
+        if (disguise == null || !disguise.HasVisibleDisguise() ||
+            spy.GetComponentInChildren<Camera>(true).cullingMask == -1 ||
+            (spy.GetComponentInChildren<Camera>(true).cullingMask & (1 << SpyDisguiseController.DisguiseVisualLayer)) != 0)
+            throw new MissingComponentException("Spy employee disguise is not configured for surveillance-only rendering.");
+        if (spyBot == null || !spyBot.ValidateSceneObjectives())
+            throw new MissingComponentException("Organizer test spy bot objectives are incomplete.");
+        if (employeeAppearanceVariants.Count < 3)
+            throw new MissingComponentException("Employee uniform appearance variants were not distributed.");
         int[] expectedEmployees = { 6, 6, 4 };
         int[] expectedGuards = { 2, 2, 3 };
         for (int i = 0; i < 3; i++)
@@ -265,8 +319,40 @@ public static class FacilityLayoutEditorUtility
         if (routeErrors.Count > 0)
             throw new MissingComponentException("Unreachable NPC patrol routes: " + string.Join(", ", routeErrors));
 
+        Terminal[] orderedTerminals = Object.FindObjectsByType<Terminal>(FindObjectsInactive.Include);
+        System.Array.Sort(orderedTerminals,
+            (left, right) => left.GetTerminalId().CompareTo(right.GetTerminalId()));
+        Vector3 elevator1 = new Vector3(0f, 0f, -10f);
+        Vector3 elevator2 = new Vector3(0f, 5f, -10f);
+        Vector3 elevator3 = new Vector3(0f, 10f, -10f);
+        ValidateCompletePath("bot start -> terminal 1", new Vector3(0f, 0f, -11.5f), orderedTerminals[0].transform.position);
+        ValidateCompletePath("terminal 1 -> 1F elevator", orderedTerminals[0].transform.position, elevator1);
+        ValidateNavMeshEndpoint("2F elevator", elevator2);
+        ValidateNavMeshEndpoint("terminal 2 restricted area", orderedTerminals[1].transform.position);
+        ValidateNavMeshEndpoint("3F elevator", elevator3);
+        ValidateNavMeshEndpoint("terminal 3 restricted area", orderedTerminals[2].transform.position);
+        ValidateCompletePath("1F elevator -> exit", elevator1,
+            Object.FindAnyObjectByType<ExitPoint>(FindObjectsInactive.Include).transform.position);
+
         Debug.Log($"Complex three-floor layout validation passed ({bluffComputerCount} bluff computers, " +
             $"16 employees, 7 guards, {triangulation.vertices.Length} NavMesh vertices).");
+    }
+
+    private static void ValidateCompletePath(string label, Vector3 start, Vector3 destination)
+    {
+        if (!NavMesh.SamplePosition(start, out NavMeshHit startHit, 4f, NavMesh.AllAreas) ||
+            !NavMesh.SamplePosition(destination, out NavMeshHit destinationHit, 4f, NavMesh.AllAreas))
+            throw new MissingComponentException($"Spy bot path endpoint is outside NavMesh: {label}.");
+        var path = new NavMeshPath();
+        if (!NavMesh.CalculatePath(startHit.position, destinationHit.position, NavMesh.AllAreas, path) ||
+            path.status != NavMeshPathStatus.PathComplete)
+            throw new MissingComponentException($"Spy bot path is unreachable: {label}.");
+    }
+
+    private static void ValidateNavMeshEndpoint(string label, Vector3 position)
+    {
+        if (!NavMesh.SamplePosition(position, out _, 4f, NavMesh.AllAreas))
+            throw new MissingComponentException($"Spy bot access-bypass endpoint is outside NavMesh: {label}.");
     }
 
     private static void CaptureCameraPreviews()

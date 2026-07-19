@@ -11,6 +11,7 @@ public class SpyController : MonoBehaviour
     [SerializeField] private CharacterController characterController;
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float sprintSpeed = 8f;
+    [SerializeField] private float employeeWalkSpeed = 2.1f;
 
     [Header("Camera")]
     [SerializeField] private Camera playerCamera;
@@ -25,9 +26,16 @@ public class SpyController : MonoBehaviour
     private float xRotation = 0f;
     private bool isMoving = false;
     private bool isSprinting = false;
+    private bool isBlendingWalk = false;
     private bool isPerformingSuspiciousAction = false;
+    private bool isPerformingRoutineActivity;
+    private RoutineActivityType routineActivityType;
+    private string routineActivityLabel;
+    private float routineActivityDuration;
+    private float routineActivityEndsAt;
     private bool inputEnabled = false;
     private SpyUI spyUI;
+    private SpyDisguiseController disguiseController;
     private IInteractable currentLookTarget;
 
     private void Awake()
@@ -39,6 +47,7 @@ public class SpyController : MonoBehaviour
     private void Start()
     {
         spyUI = FindAnyObjectByType<SpyUI>();
+        disguiseController = GetComponent<SpyDisguiseController>();
 
         if (playerCamera == null)
             playerCamera = GetComponentInChildren<Camera>();
@@ -49,6 +58,13 @@ public class SpyController : MonoBehaviour
     private void Update()
     {
         if (!inputEnabled) return;
+
+        if (isPerformingRoutineActivity)
+        {
+            UpdateRoutineActivity();
+            UpdateCamera();
+            return;
+        }
 
         UpdateInteractionTarget();
         HandleInput();
@@ -83,6 +99,7 @@ public class SpyController : MonoBehaviour
             moveInput = Vector2.zero;
             isMoving = false;
             isSprinting = false;
+            isBlendingWalk = false;
             return;
         }
 
@@ -98,6 +115,7 @@ public class SpyController : MonoBehaviour
 
         // スプリント
         isSprinting = keyboard.leftShiftKey.isPressed && isMoving;
+        isBlendingWalk = keyboard.leftCtrlKey.isPressed && isMoving && !isSprinting;
 
         // インタラクション
         if (keyboard.eKey.wasPressedThisFrame)
@@ -116,7 +134,7 @@ public class SpyController : MonoBehaviour
     {
         Vector3 moveDir = (transform.forward * moveInput.y + transform.right * moveInput.x).normalized;
 
-        float currentSpeed = isSprinting ? sprintSpeed : moveSpeed;
+        float currentSpeed = isSprinting ? sprintSpeed : isBlendingWalk ? employeeWalkSpeed : moveSpeed;
         
         velocity.x = moveDir.x * currentSpeed;
         velocity.z = moveDir.z * currentSpeed;
@@ -157,6 +175,13 @@ public class SpyController : MonoBehaviour
 
     public void OnGameStart()
     {
+        disguiseController ??= GetComponent<SpyDisguiseController>();
+        disguiseController?.ApplyNewIdentity();
+        if (disguiseController != null)
+        {
+            spyUI?.SetDisguiseIdentity(disguiseController.GetEmployeeId());
+            spyUI?.ShowTransientMessage($"偽装社員ID: {disguiseController.GetEmployeeId()} / Left Ctrlで社員歩行", 4f);
+        }
         Debug.Log("🕵️ Spy: Game started!");
     }
 
@@ -181,6 +206,63 @@ public class SpyController : MonoBehaviour
         return isSprinting;
     }
 
+    public bool IsMoving() => isMoving;
+    public bool IsBlendingWalk() => isBlendingWalk;
+    public bool IsPerformingRoutineActivity() => isPerformingRoutineActivity;
+
+    public void BeginRoutineActivity(RoutineActivityType activityType, float duration, string label)
+    {
+        if (!inputEnabled || isPerformingSuspiciousAction || isPerformingRoutineActivity)
+            return;
+
+        routineActivityType = activityType;
+        routineActivityLabel = string.IsNullOrWhiteSpace(label) ? "社員行動" : label;
+        routineActivityDuration = Mathf.Max(1f, duration);
+        routineActivityEndsAt = Time.time + routineActivityDuration;
+        isPerformingRoutineActivity = true;
+        isMoving = false;
+        isSprinting = false;
+        isBlendingWalk = false;
+        moveInput = Vector2.zero;
+        velocity.x = 0f;
+        velocity.z = 0f;
+        spyUI?.ClearInteractionPrompt();
+        spyUI?.ShowHackingProgress(true, $"{routineActivityLabel}中... [E] キャンセル");
+    }
+
+    private void UpdateRoutineActivity()
+    {
+        if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
+        {
+            CancelRoutineActivity(true);
+            return;
+        }
+
+        float remaining = Mathf.Max(0f, routineActivityEndsAt - Time.time);
+        spyUI?.UpdateHackingProgress(1f - remaining / Mathf.Max(0.1f, routineActivityDuration));
+
+        if (Time.time < routineActivityEndsAt)
+            return;
+
+        SuspicionGauge gauge = GetComponent<SuspicionGauge>();
+        gauge?.ReportSafeActivity(routineActivityType == RoutineActivityType.Break ? "restArea" : "terminalOperation");
+        string completedLabel = routineActivityLabel;
+        CancelRoutineActivity(false);
+        spyUI?.ShowTransientMessage($"{completedLabel}を完了：周囲に溶け込みました", 2.5f);
+    }
+
+    private void CancelRoutineActivity(bool notify)
+    {
+        if (!isPerformingRoutineActivity)
+            return;
+        isPerformingRoutineActivity = false;
+        routineActivityDuration = 0f;
+        routineActivityEndsAt = 0f;
+        spyUI?.ShowHackingProgress(false);
+        if (notify)
+            spyUI?.ShowTransientMessage($"{routineActivityLabel}を中断しました", 1.5f);
+    }
+
     public bool IsPerformingSuspiciousAction()
     {
         return isPerformingSuspiciousAction;
@@ -200,7 +282,9 @@ public class SpyController : MonoBehaviour
             moveInput = Vector2.zero;
             isMoving = false;
             isSprinting = false;
+            isBlendingWalk = false;
             isPerformingSuspiciousAction = false;
+            CancelRoutineActivity(false);
             currentLookTarget = null;
             spyUI?.ClearInteractionPrompt();
         }

@@ -8,6 +8,8 @@ using UnityEngine.AI;
 [RequireComponent(typeof(NavMeshAgent))]
 public class OfficeNpcController : MonoBehaviour
 {
+    public const int EmployeeAppearanceVariantCount = 4;
+
     public enum NpcRole
     {
         Employee,
@@ -17,6 +19,7 @@ public class OfficeNpcController : MonoBehaviour
     [SerializeField] private NpcRole role;
     [SerializeField] private string npcLabel;
     [SerializeField] private int floorNumber = 1;
+    [SerializeField] private int appearanceVariant;
     [SerializeField] private Vector3[] patrolRoute;
     [SerializeField] private float visionDistance = 9f;
     [SerializeField] private float visionAngle = 75f;
@@ -27,7 +30,9 @@ public class OfficeNpcController : MonoBehaviour
     private NavMeshAgent agent;
     private SpyController spy;
     private SuspicionGauge suspicionGauge;
-    private Renderer[] visualRenderers;
+    private Renderer bodyRenderer;
+    private Renderer headRenderer;
+    private Renderer capRenderer;
     private int waypointIndex;
     private float waitUntil;
     private float awareness;
@@ -54,6 +59,11 @@ public class OfficeNpcController : MonoBehaviour
         waypointWaitMax = isGuard ? 2f : 5f;
     }
 
+    public void ConfigureAppearance(int variant)
+    {
+        appearanceVariant = Mathf.Abs(variant) % EmployeeAppearanceVariantCount;
+    }
+
     private void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
@@ -75,7 +85,9 @@ public class OfficeNpcController : MonoBehaviour
     {
         spy = FindAnyObjectByType<SpyController>(FindObjectsInactive.Include);
         suspicionGauge = spy != null ? spy.GetComponent<SuspicionGauge>() : null;
-        visualRenderers = GetComponentsInChildren<Renderer>(true);
+        bodyRenderer = transform.Find(npcLabel + "_Body")?.GetComponent<Renderer>();
+        headRenderer = transform.Find(npcLabel + "_Head")?.GetComponent<Renderer>();
+        capRenderer = transform.Find(npcLabel + "_SecurityCap")?.GetComponent<Renderer>();
         InitializeOnNavMesh();
     }
 
@@ -232,6 +244,8 @@ public class OfficeNpcController : MonoBehaviour
             float behaviorMultiplier = 1f;
             if (spy.IsSprinting())
                 behaviorMultiplier *= 1.8f;
+            else if (spy.IsMoving() && !spy.IsBlendingWalk())
+                behaviorMultiplier *= 1.25f;
             if (spy.IsPerformingSuspiciousAction())
                 behaviorMultiplier *= 2.2f;
 
@@ -286,18 +300,51 @@ public class OfficeNpcController : MonoBehaviour
 
     private void UpdateAlertVisual()
     {
-        if (visualRenderers == null)
+        Color uniformColor = role == NpcRole.SecurityGuard
+            ? new Color(0.08f, 0.24f, 0.42f)
+            : GetEmployeeUniformColor(appearanceVariant);
+        Color alertColor = Color.Lerp(uniformColor,
+            role == NpcRole.SecurityGuard ? new Color(1f, 0.08f, 0.04f) : new Color(1f, 0.42f, 0.08f),
+            awareness);
+
+        ApplyRendererColor(bodyRenderer, alertColor);
+        ApplyRendererColor(capRenderer, alertColor);
+        ApplyRendererColor(headRenderer, role == NpcRole.SecurityGuard
+            ? new Color(0.74f, 0.55f, 0.42f)
+            : GetEmployeeSkinColor(appearanceVariant));
+    }
+
+    private static void ApplyRendererColor(Renderer target, Color color)
+    {
+        if (target == null)
             return;
-
-        Color alertColor = role == NpcRole.SecurityGuard
-            ? Color.Lerp(new Color(0.08f, 0.24f, 0.42f), new Color(1f, 0.08f, 0.04f), awareness)
-            : Color.Lerp(new Color(0.68f, 0.73f, 0.78f), new Color(1f, 0.42f, 0.08f), awareness);
-
         var block = new MaterialPropertyBlock();
-        block.SetColor("_BaseColor", alertColor);
-        block.SetColor("_Color", alertColor);
-        foreach (Renderer renderer in visualRenderers)
-            renderer.SetPropertyBlock(block);
+        target.GetPropertyBlock(block);
+        block.SetColor("_BaseColor", color);
+        block.SetColor("_Color", color);
+        target.SetPropertyBlock(block);
+    }
+
+    public static Color GetEmployeeUniformColor(int variant)
+    {
+        switch (Mathf.Abs(variant) % EmployeeAppearanceVariantCount)
+        {
+            case 1: return new Color(0.58f, 0.66f, 0.74f);
+            case 2: return new Color(0.72f, 0.70f, 0.66f);
+            case 3: return new Color(0.54f, 0.62f, 0.66f);
+            default: return new Color(0.68f, 0.73f, 0.78f);
+        }
+    }
+
+    public static Color GetEmployeeSkinColor(int variant)
+    {
+        switch (Mathf.Abs(variant) % EmployeeAppearanceVariantCount)
+        {
+            case 1: return new Color(0.66f, 0.47f, 0.34f);
+            case 2: return new Color(0.80f, 0.64f, 0.50f);
+            case 3: return new Color(0.58f, 0.40f, 0.30f);
+            default: return new Color(0.74f, 0.55f, 0.42f);
+        }
     }
 
     public NpcRole GetNpcRole() => role;
@@ -306,6 +353,7 @@ public class OfficeNpcController : MonoBehaviour
     public Vector3[] GetPatrolRoute() => patrolRoute;
     public int GetFloorNumber() => floorNumber;
     public bool IsFollowingForgedCommand() => followingForgedCommand;
+    public int GetAppearanceVariant() => appearanceVariant;
     public bool CanReactToCommand(CommandType commandType, Vector3 location)
     {
         return GetFloorNumber(location) == floorNumber && ShouldReactTo(commandType);

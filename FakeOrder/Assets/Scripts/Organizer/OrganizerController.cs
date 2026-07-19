@@ -457,6 +457,8 @@ public class OrganizerController : MonoBehaviour
 
     public void OnGameStart()
     {
+        if (GameManager.Instance != null && GameManager.Instance.GetSelectedRole() == GameManager.LocalRole.Organizer)
+            organizerUI?.ShowAlert("侵入シミュレーション開始：社員に擬態したスパイAIを追跡してください", 5f);
         Debug.Log("🔐 Organizer: Game started!");
     }
 

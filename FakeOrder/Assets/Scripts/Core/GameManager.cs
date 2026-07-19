@@ -15,6 +15,7 @@ public class GameManager : MonoBehaviour
     private LocalRole selectedRole = LocalRole.None;
 
     private SpyController spyController;
+    private SpyBotController spyBotController;
     private OrganizerController organizerController;
     private SpyUI spyUI;
     private OrganizerUI organizerUI;
@@ -22,6 +23,7 @@ public class GameManager : MonoBehaviour
     private SuspicionGauge suspicionGauge;
     private InformationFreshness informationFreshness;
     private GameState gameState;
+    private GameResult lastResult;
 
     public enum GamePhase
     {
@@ -86,6 +88,7 @@ public class GameManager : MonoBehaviour
     private void InitializeFlow()
     {
         spyController = FindAnyObjectByType<SpyController>();
+        spyBotController = FindAnyObjectByType<SpyBotController>();
         organizerController = FindAnyObjectByType<OrganizerController>();
         spyUI = FindAnyObjectByType<SpyUI>();
         organizerUI = FindAnyObjectByType<OrganizerUI>();
@@ -206,6 +209,7 @@ public class GameManager : MonoBehaviour
 
     public void EndGame(GameResult result)
     {
+        lastResult = result;
         currentPhase = GamePhase.Finished;
         gameState.IsGameActive = false;
         SetRoleControls(false);
@@ -231,9 +235,21 @@ public class GameManager : MonoBehaviour
         return selectedRole;
     }
 
+    public GameResult GetLastResult() => lastResult;
+
+#if UNITY_EDITOR
+    public void StartImmediateEditorValidation(LocalRole role)
+    {
+        SelectLocalRole(role);
+        preparationTimer = 0f;
+        StartMainGame();
+    }
+#endif
+
     private void SetRoleControls(bool phaseAllowsInput)
     {
         spyController?.SetControlEnabled(phaseAllowsInput && selectedRole == LocalRole.Spy);
+        spyBotController?.SetBotEnabled(phaseAllowsInput && selectedRole == LocalRole.Organizer);
         organizerController?.SetControlEnabled(phaseAllowsInput && selectedRole == LocalRole.Organizer);
     }
 

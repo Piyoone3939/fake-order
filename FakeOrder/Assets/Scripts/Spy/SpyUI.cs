@@ -21,6 +21,7 @@ public class SpyUI : MonoBehaviour
 
     private Image suspicionGaugeImage;
     private Text suspicionPercentText;
+    private Text disguiseIdentityText;
 
     private RectTransform minimapContent;
     private Image playerMarker;
@@ -54,6 +55,7 @@ public class SpyUI : MonoBehaviour
 
         BuildInformationPanel();
         BuildSuspicionPanel();
+        BuildDisguiseIdentityPanel();
         BuildMinimap();
         BuildInteractionPrompt();
         BuildLogAccessNotice();
@@ -171,6 +173,18 @@ public class SpyUI : MonoBehaviour
 
         suspicionPercentText = CreateText("PercentText", barBg.rectTransform, "0%", 14, TextAnchor.MiddleCenter, Color.white);
         SetStretch(suspicionPercentText.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+    }
+
+    private void BuildDisguiseIdentityPanel()
+    {
+        RectTransform panel = CreateUIObject("DisguiseIdentityPanel", transform);
+        SetStretch(panel, new Vector2(0.36f, 0.91f), new Vector2(0.64f, 0.985f), Vector2.zero, Vector2.zero);
+        panel.gameObject.AddComponent<Image>().color = new Color(0.02f, 0.08f, 0.12f, 0.86f);
+        disguiseIdentityText = CreateText("DisguiseIdentityText", panel,
+            "偽装社員ID: ---   /   Left Ctrl: 社員歩行", 16,
+            TextAnchor.MiddleCenter, new Color(0.62f, 0.88f, 1f));
+        SetStretch(disguiseIdentityText.rectTransform, Vector2.zero, Vector2.one,
+            new Vector2(10f, 0f), new Vector2(-10f, 0f));
     }
 
     private void BuildMinimap()
@@ -311,6 +325,12 @@ public class SpyUI : MonoBehaviour
         Invoke(nameof(HideTransientMessage), duration);
     }
 
+    public void SetDisguiseIdentity(string employeeId)
+    {
+        if (disguiseIdentityText != null)
+            disguiseIdentityText.text = $"偽装社員ID: {employeeId}   /   Left Ctrl: 社員歩行";
+    }
+
     private void HideTransientMessage()
     {
         if (transientMessagePanel != null)
@@ -412,6 +432,9 @@ public class SpyUI : MonoBehaviour
 
         if (informationStatusText != null)
             informationStatusText.text = "情報収集: 0/3";
+
+        if (disguiseIdentityText != null)
+            disguiseIdentityText.text = "偽装社員ID: ---   /   Left Ctrl: 社員歩行";
 
         UpdateSuspicionDisplay();
     }

@@ -233,6 +233,8 @@ public class GamePrototypeSetup : MonoBehaviour
         
         // SpyController
         var spyController = spyGO.AddComponent<SpyController>();
+        spyGO.AddComponent<SpyDisguiseController>();
+        spyGO.AddComponent<SpyBotController>();
         
         // カメラ
         GameObject cameraGO = new GameObject("Camera");
@@ -241,6 +243,7 @@ public class GamePrototypeSetup : MonoBehaviour
         
         var camera = cameraGO.AddComponent<Camera>();
         camera.fieldOfView = 60f;
+        camera.cullingMask &= ~(1 << SpyDisguiseController.DisguiseVisualLayer);
         cameraGO.tag = "MainCamera";
 
         // Audio Listener（Spy側のみに1つ）
@@ -494,6 +497,7 @@ public class GamePrototypeSetup : MonoBehaviour
     private void CreateFacilityLayout()
     {
         CreateOfficeMaterials();
+        EnsureSpyEmployeeDisguise();
         GameObject root = new GameObject("Facility_3Floor");
         facilityRoot = root.transform;
 
@@ -719,7 +723,71 @@ public class GamePrototypeSetup : MonoBehaviour
             scaledRoute[i] = ScaleFacilityPosition(route[i]);
 
         int assignedFloor = Mathf.Clamp(Mathf.RoundToInt(spawnPosition.y / FloorHeight) + 1, 1, 3);
-        npc.AddComponent<OfficeNpcController>().Configure(role, objectName, assignedFloor, scaledRoute);
+        OfficeNpcController controller = npc.AddComponent<OfficeNpcController>();
+        controller.Configure(role, objectName, assignedFloor, scaledRoute);
+        controller.ConfigureAppearance(GetStableAppearanceVariant(objectName));
+    }
+
+    private static int GetStableAppearanceVariant(string value)
+    {
+        int total = 0;
+        for (int i = 0; i < value.Length; i++)
+            total = (total * 31 + value[i]) & 0x7fffffff;
+        return total % OfficeNpcController.EmployeeAppearanceVariantCount;
+    }
+
+    private void EnsureSpyEmployeeDisguise()
+    {
+        SpyController spy = FindAnyObjectByType<SpyController>(FindObjectsInactive.Include);
+        if (spy == null)
+            return;
+
+        SpyDisguiseController disguise = spy.GetComponent<SpyDisguiseController>();
+        if (disguise == null)
+            disguise = spy.gameObject.AddComponent<SpyDisguiseController>();
+        if (spy.GetComponent<SpyBotController>() == null)
+            spy.gameObject.AddComponent<SpyBotController>();
+
+        Transform visual = spy.transform.Find("SpyDisguiseVisual");
+        if (visual == null)
+        {
+            var visualObject = new GameObject("SpyDisguiseVisual");
+            visualObject.transform.SetParent(spy.transform, false);
+            visual = visualObject.transform;
+        }
+
+        Renderer bodyRenderer = visual.Find("EmployeeBody")?.GetComponent<Renderer>();
+        if (bodyRenderer == null)
+        {
+            GameObject body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            body.name = "EmployeeBody";
+            body.transform.SetParent(visual, false);
+            body.transform.localPosition = new Vector3(0f, 0.9f, 0f);
+            body.transform.localScale = new Vector3(0.42f, 0.72f, 0.42f);
+            DestroySetupObject(body.GetComponent<Collider>());
+            bodyRenderer = body.GetComponent<Renderer>();
+        }
+
+        Renderer headRenderer = visual.Find("EmployeeHead")?.GetComponent<Renderer>();
+        if (headRenderer == null)
+        {
+            GameObject head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            head.name = "EmployeeHead";
+            head.transform.SetParent(visual, false);
+            head.transform.localPosition = new Vector3(0f, 1.65f, 0f);
+            head.transform.localScale = Vector3.one * 0.42f;
+            DestroySetupObject(head.GetComponent<Collider>());
+            headRenderer = head.GetComponent<Renderer>();
+        }
+
+        bodyRenderer.sharedMaterial = employeeNpcMaterial;
+        headRenderer.sharedMaterial = npcSkinMaterial;
+        SetLayerRecursively(visual.gameObject, SpyDisguiseController.DisguiseVisualLayer);
+        disguise.Configure(bodyRenderer, headRenderer);
+
+        Camera spyCamera = spy.GetComponentInChildren<Camera>(true);
+        if (spyCamera != null)
+            spyCamera.cullingMask &= ~(1 << SpyDisguiseController.DisguiseVisualLayer);
     }
 
     private static void SetLayerRecursively(GameObject target, int layer)
@@ -930,8 +998,10 @@ public class GamePrototypeSetup : MonoBehaviour
 
         float fixtureWidth = Mathf.Clamp(size.x * 0.32f, 1.2f, 3.2f);
         float fixtureDepth = Mathf.Clamp(size.y * 0.18f, 0.7f, 1.4f);
-        CreateBlock($"{floorNumber}F_{roomName}_Fixture", new Vector3(center.x, baseY + 0.4f,
+        GameObject fixture = CreateBlock($"{floorNumber}F_{roomName}_Fixture", new Vector3(center.x, baseY + 0.4f,
             center.y + size.y * 0.22f), new Vector3(fixtureWidth, 0.8f, fixtureDepth), parent);
+        if (roomName.Contains("BREAK"))
+            fixture.AddComponent<RoutineActivityPoint>().Configure(RoutineActivityType.Break, 5f, "自然に休憩");
     }
 
     private void CreateOpenArea(int floorNumber, string areaName, Vector2 center, Vector2 size,
@@ -984,6 +1054,7 @@ public class GamePrototypeSetup : MonoBehaviour
         GameObject monitor = CreateLocalBlock($"BluffComputer_{workstationName}", new Vector3(0f, 1.08f, 0.12f),
             new Vector3(0.9f, 0.62f, 0.12f), root.transform);
         SetObjectMaterial(monitor, officeMonitorMaterial);
+        monitor.AddComponent<RoutineActivityPoint>().Configure(RoutineActivityType.Workstation, 4f, "通常業務");
         CreateLocalBlock($"{workstationName}_MonitorStand", new Vector3(0f, 0.78f, 0.12f),
             new Vector3(0.12f, 0.35f, 0.12f), root.transform);
 
