@@ -111,7 +111,10 @@ public class RoleSelectionUI : MonoBehaviour
         if (statusText != null)
         {
             string roleName = role == GameManager.LocalRole.Spy ? "スパイ" : "オーガナイザー";
-            statusText.text = $"{roleName} / 準備フェーズ  残り {Mathf.CeilToInt(remainingSeconds)}秒  /  [Enter] 開始";
+            bool waitingForHost = FakeOrderNetworkSession.Instance != null &&
+                FakeOrderNetworkSession.Instance.HasAssignedRole && FakeOrderNetworkSession.Instance.IsRemoteClient;
+            string startHint = waitingForHost ? "Hostの開始待ち" : "[Enter] 開始";
+            statusText.text = $"{roleName} / 準備フェーズ  残り {Mathf.CeilToInt(remainingSeconds)}秒  /  {startHint}";
         }
     }
 

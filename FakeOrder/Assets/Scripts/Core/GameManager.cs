@@ -59,6 +59,10 @@ public class GameManager : MonoBehaviour
 
     private void Update()
     {
+        FakeOrderNetworkSession session = FakeOrderNetworkSession.Instance;
+        if (session != null && session.HasAssignedRole && session.IsRemoteClient)
+            return;
+
         var keyboard = Keyboard.current;
         if (currentPhase != GamePhase.Title && currentPhase != GamePhase.RoleSelection &&
             keyboard != null && keyboard.f1Key.wasPressedThisFrame)
@@ -157,6 +161,9 @@ public class GameManager : MonoBehaviour
         spyUI?.ResetForNewGame();
         suspicionGauge?.ResetGauge();
 
+        if (role == LocalRole.Spy)
+            spyController?.ResetToSpawn();
+
         SetCanvasVisible(spyUI, role == LocalRole.Spy);
         SetCanvasVisible(organizerUI, role == LocalRole.Organizer);
         SetRoleControls(false);
@@ -196,6 +203,9 @@ public class GameManager : MonoBehaviour
         spyUI?.ResetForNewGame();
         suspicionGauge?.ResetGauge();
         roleSelectionUI?.HideStatus();
+
+        if (selectedRole == LocalRole.Spy)
+            spyController?.ResetToSpawn();
         SetRoleControls(true);
 
         if (spyController != null)
@@ -208,6 +218,18 @@ public class GameManager : MonoBehaviour
     }
 
     public void EndGame(GameResult result)
+    {
+        FakeOrderNetworkSession session = FakeOrderNetworkSession.Instance;
+        if (session != null && session.HasAssignedRole && session.IsRemoteClient)
+        {
+            session.RequestGameResult(result);
+            return;
+        }
+
+        FinishGame(result);
+    }
+
+    private void FinishGame(GameResult result)
     {
         lastResult = result;
         currentPhase = GamePhase.Finished;
@@ -236,6 +258,54 @@ public class GameManager : MonoBehaviour
     }
 
     public GameResult GetLastResult() => lastResult;
+
+    public float GetNetworkRemainingSeconds()
+    {
+        if (currentPhase == GamePhase.Preparation)
+            return Mathf.Max(0f, preparationTimer);
+        if (currentPhase == GamePhase.Playing && gameState != null)
+            return Mathf.Max(0f, gameState.GameMaxDuration - gameState.GetElapsedTime());
+        return 0f;
+    }
+
+    public void ApplyNetworkRole(LocalRole role)
+    {
+        if (role == LocalRole.None)
+            return;
+        SelectLocalRole(role);
+    }
+
+    public void ApplyNetworkSnapshot(GamePhase phase, float remainingSeconds, GameResult result)
+    {
+        if (selectedRole == LocalRole.None)
+            return;
+
+        switch (phase)
+        {
+            case GamePhase.Preparation:
+                preparationTimer = Mathf.Max(0f, remainingSeconds);
+                roleSelectionUI?.ShowPreparation(selectedRole, preparationTimer);
+                break;
+            case GamePhase.Playing:
+                if (currentPhase != GamePhase.Playing)
+                    StartMainGame();
+                break;
+            case GamePhase.Finished:
+                if (currentPhase != GamePhase.Finished)
+                    FinishGame(result);
+                break;
+        }
+    }
+
+    public void ApplyAuthoritativeNetworkResult(GameResult result)
+    {
+        FinishGame(result);
+    }
+
+    public void CancelNetworkMatch()
+    {
+        EnterRoleSelection();
+    }
 
 #if UNITY_EDITOR
     public void StartImmediateEditorValidation(LocalRole role)

@@ -15,6 +15,7 @@ public class GamePrototypeSetup : MonoBehaviour
     private const float FacilityDepth = 42f;
     // 俯瞰マップ専用。TagManagerに名前を追加しなくてもレイヤー番号は描画制御に使用できる。
     private const int FirstFloorMapLayer = 30;
+    private static readonly Vector3 SpySpawnPosition = new Vector3(0f, 1.05f, -11.5f);
     private enum RoomDoorSide { North, South, East, West }
     [SerializeField, HideInInspector] private bool sceneObjectsGenerated;
     private bool isGenerating;
@@ -224,7 +225,7 @@ public class GamePrototypeSetup : MonoBehaviour
     {
         // Spy オブジェクト
         GameObject spyGO = new GameObject("Spy");
-        spyGO.transform.position = ScaleFacilityPosition(new Vector3(0f, 0.9f, -11.5f));
+        spyGO.transform.position = SpySpawnPosition;
         
         // CharacterController
         var charController = spyGO.AddComponent<CharacterController>();
@@ -815,8 +816,16 @@ public class GamePrototypeSetup : MonoBehaviour
         CreateWall($"{floorNumber}F_Perimeter_North", new Vector3(0f, wallY, FacilityDepth * 0.5f), new Vector3(FacilityWidth, 4.7f, 0.35f), floor);
         CreateWall($"{floorNumber}F_Perimeter_West", new Vector3(-FacilityWidth * 0.5f, wallY, 0f), new Vector3(0.35f, 4.7f, FacilityDepth), floor);
         CreateWall($"{floorNumber}F_Perimeter_East", new Vector3(FacilityWidth * 0.5f, wallY, 0f), new Vector3(0.35f, 4.7f, FacilityDepth), floor);
-        CreateWall($"{floorNumber}F_Perimeter_South_West", ScaleFacilityPosition(new Vector3(-12f, wallY, -15f)), new Vector3(28f, 4.7f, 0.35f), floor);
-        CreateWall($"{floorNumber}F_Perimeter_South_East", ScaleFacilityPosition(new Vector3(12f, wallY, -15f)), new Vector3(28f, 4.7f, 0.35f), floor);
+        if (floorNumber == 1)
+        {
+            CreateWall($"{floorNumber}F_Perimeter_South_West", ScaleFacilityPosition(new Vector3(-12f, wallY, -15f)), new Vector3(28f, 4.7f, 0.35f), floor);
+            CreateWall($"{floorNumber}F_Perimeter_South_East", ScaleFacilityPosition(new Vector3(12f, wallY, -15f)), new Vector3(28f, 4.7f, 0.35f), floor);
+        }
+        else
+        {
+            CreateWall($"{floorNumber}F_Perimeter_South", new Vector3(0f, wallY, -FacilityDepth * 0.5f),
+                new Vector3(FacilityWidth, 4.7f, 0.35f), floor);
+        }
 
         CreateFloorLighting(floorNumber, baseY, floor);
         return floor;
@@ -1372,7 +1381,7 @@ public class GamePrototypeSetup : MonoBehaviour
 
         SpyController spy = FindAnyObjectByType<SpyController>(FindObjectsInactive.Include);
         if (spy != null)
-            spy.transform.position = new Vector3(0f, 0.9f, -11.5f);
+            spy.transform.position = SpySpawnPosition;
 
 #if UNITY_EDITOR
         if (!Application.isPlaying)

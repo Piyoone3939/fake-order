@@ -292,6 +292,13 @@ public static class FacilityLayoutEditorUtility
             throw new MissingComponentException("The overview map is not isolated to the first-floor layer.");
         if (firstFloorSlab == null || firstFloorSlab.transform.localScale.x < 60f)
             throw new MissingComponentException("The enlarged office floor was not generated.");
+        if (firstFloorSlab.GetComponent<Collider>() == null || spy == null || spy.transform.position.y < 1f ||
+            !firstFloorSlab.GetComponent<Collider>().bounds.Contains(
+                new Vector3(spy.transform.position.x, firstFloorSlab.GetComponent<Collider>().bounds.center.y,
+                    spy.transform.position.z)))
+            throw new MissingComponentException("Spy entrance spawn is not safely positioned above the first-floor slab.");
+        ValidateUpperFloorSouthWall(2, 7.35f);
+        ValidateUpperFloorSouthWall(3, 12.35f);
         if (bluffComputerCount < 40)
             throw new MissingComponentException($"Expected at least 40 bluff computers, found {bluffComputerCount}.");
         if (routinePoints.Length < bluffComputerCount + 1 ||
@@ -373,6 +380,19 @@ public static class FacilityLayoutEditorUtility
 
         Debug.Log($"Complex three-floor layout validation passed ({bluffComputerCount} bluff computers, " +
             $"16 employees, 7 guards, {triangulation.vertices.Length} NavMesh vertices).");
+    }
+
+    private static void ValidateUpperFloorSouthWall(int floorNumber, float wallY)
+    {
+        string prefix = $"{floorNumber}F_Perimeter_South";
+        Vector3 entranceCenter = new Vector3(0f, wallY, -21f);
+        foreach (BoxCollider wall in Object.FindObjectsByType<BoxCollider>(FindObjectsInactive.Include))
+        {
+            if (wall.name.StartsWith(prefix) && wall.bounds.Contains(entranceCenter))
+                return;
+        }
+
+        throw new MissingComponentException($"{floorNumber}F entrance-side perimeter wall has an opening.");
     }
 
     private static void ValidateCompletePath(string label, Vector3 start, Vector3 destination)

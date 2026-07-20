@@ -24,7 +24,7 @@ public class SpyBotController : MonoBehaviour
     [SerializeField] private float hackingDuration = 5f;
     [SerializeField] private float initialDelay = 3f;
     [SerializeField] private float accessBypassDuration = 3f;
-    [SerializeField] private Vector3 startPosition = new Vector3(0f, 0.9f, -11.5f);
+    [SerializeField] private Vector3 startPosition = new Vector3(0f, 1.05f, -11.5f);
 
     private NavMeshAgent agent;
     private CharacterController characterController;

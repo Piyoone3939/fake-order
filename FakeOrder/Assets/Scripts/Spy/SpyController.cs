@@ -7,6 +7,8 @@ using UnityEngine.InputSystem;
 /// </summary>
 public class SpyController : MonoBehaviour
 {
+    private static readonly Vector3 DefaultSpawnPosition = new Vector3(0f, 1.05f, -11.5f);
+
     [Header("Movement")]
     [SerializeField] private CharacterController characterController;
     [SerializeField] private float moveSpeed = 5f;
@@ -37,6 +39,7 @@ public class SpyController : MonoBehaviour
     private SpyUI spyUI;
     private SpyDisguiseController disguiseController;
     private IInteractable currentLookTarget;
+    private bool hasRecoveredFromFall;
 
     private void Awake()
     {
@@ -57,6 +60,12 @@ public class SpyController : MonoBehaviour
 
     private void Update()
     {
+        if (transform.position.y < -2f)
+        {
+            RecoverFromFall();
+            return;
+        }
+
         if (!inputEnabled) return;
 
         if (isPerformingRoutineActivity)
@@ -199,6 +208,25 @@ public class SpyController : MonoBehaviour
         velocity = Vector3.zero;
         if (characterController != null)
             characterController.enabled = wasEnabled;
+    }
+
+    public void ResetToSpawn()
+    {
+        TeleportTo(DefaultSpawnPosition);
+        hasRecoveredFromFall = false;
+        Physics.SyncTransforms();
+    }
+
+    private void RecoverFromFall()
+    {
+        TeleportTo(DefaultSpawnPosition);
+        Physics.SyncTransforms();
+        if (!hasRecoveredFromFall)
+        {
+            Debug.LogWarning("Spy left the playable floor and was returned to the entrance spawn.");
+            spyUI?.ShowTransientMessage("エリア外への落下を検知したため、開始地点へ戻りました", 3f);
+            hasRecoveredFromFall = true;
+        }
     }
 
     public bool IsSprinting()
