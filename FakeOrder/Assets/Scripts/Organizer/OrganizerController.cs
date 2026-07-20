@@ -522,6 +522,26 @@ public class OrganizerController : MonoBehaviour
 
     public int GetIdentificationAuthority() => identificationAuthority;
     public bool IsIdentifyingSuspect() => isIdentifyingSuspect;
+
+#if UNITY_EDITOR
+    public void ConfigureEditorIdentificationValidation()
+    {
+        identificationDuration = 0.05f;
+        falseIdentificationCooldown = 0.1f;
+        ResetIdentificationSystem();
+    }
+
+    public float GetIdentificationCooldownRemainingForEditor()
+    {
+        return Mathf.Max(0f, nextIdentificationAllowedAt - Time.time);
+    }
+
+    public void ResolveIdentificationForEditor(int cameraIndex)
+    {
+        identificationCameraIndex = cameraIndex;
+        CompleteIdentification();
+    }
+#endif
 }
 
 public enum CommandType

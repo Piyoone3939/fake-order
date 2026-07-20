@@ -39,6 +39,11 @@ public class DelayedSurveillance : MonoBehaviour
         {
             if (area.liveRenderTexture == null) continue;
 
+            // 再初期化時は旧リングバッファのカーソルを引き継がない。
+            area.writeIndex = 0;
+            area.filledCount = 0;
+            area.captureTimer = 0f;
+
             int slotCount = Mathf.Max(1, Mathf.CeilToInt(area.delayTime / snapshotInterval) + 1);
             area.ringBuffer = new RenderTexture[slotCount];
             area.captureTimestamps = new float[slotCount];
@@ -182,6 +187,27 @@ public class DelayedSurveillance : MonoBehaviour
     {
         return cameraAreas.Count;
     }
+
+#if UNITY_EDITOR
+    /// <summary>Play Mode自動検証で、映像と所在メタデータを同一フレームとして即時評価する。</summary>
+    public void ConfigureEditorIdentificationValidation()
+    {
+        snapshotInterval = 0.05f;
+        foreach (CameraArea area in cameraAreas)
+            area.delayTime = 0f;
+        ReleaseBuffers();
+        Initialize();
+    }
+
+    public void CaptureAllSnapshotsForEditor()
+    {
+        foreach (CameraArea area in cameraAreas)
+        {
+            if (area.ringBuffer != null)
+                CaptureSnapshot(area);
+        }
+    }
+#endif
 
     private void OnDestroy()
     {

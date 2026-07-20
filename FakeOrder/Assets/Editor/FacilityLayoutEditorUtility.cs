@@ -13,6 +13,7 @@ using UnityEngine.SceneManagement;
 public static class FacilityLayoutEditorUtility
 {
     private const string SpyBotPlayValidationKey = "FakeOrder.SpyBotPlayValidation";
+    private const string IdentificationPlayValidationKey = "FakeOrder.IdentificationPlayValidation";
     private const string PrototypeScenePath = "Assets/Scenes/GamePrototype.unity";
     private const string NavigationFolder = "Assets/Navigation";
     private static readonly string[] FloorObjectNames =
@@ -75,6 +76,20 @@ public static class FacilityLayoutEditorUtility
         };
     }
 
+    [InitializeOnLoadMethod]
+    private static void ResumeIdentificationPlayValidation()
+    {
+        if (!SessionState.GetBool(IdentificationPlayValidationKey, false))
+            return;
+        EditorApplication.delayCall += () =>
+        {
+            if (!EditorApplication.isPlaying)
+                return;
+            EditorApplication.update -= MonitorIdentificationPlayValidation;
+            EditorApplication.update += MonitorIdentificationPlayValidation;
+        };
+    }
+
     [MenuItem("Fake Order/Facility/Rebuild Three Floor Layout")]
     public static void RebuildInCurrentScene()
     {
@@ -131,6 +146,13 @@ public static class FacilityLayoutEditorUtility
         EditorApplication.isPlaying = true;
     }
 
+    public static void VerifyIdentificationPlayModeForCommandLine()
+    {
+        EditorSceneManager.OpenScene(PrototypeScenePath, OpenSceneMode.Single);
+        SessionState.SetBool(IdentificationPlayValidationKey, true);
+        EditorApplication.isPlaying = true;
+    }
+
     private static void MonitorSpyBotPlayValidation()
     {
         if (!EditorApplication.isPlaying)
@@ -142,6 +164,21 @@ public static class FacilityLayoutEditorUtility
         EditorApplication.update -= MonitorSpyBotPlayValidation;
         SessionState.SetBool(SpyBotPlayValidationKey, false);
         new GameObject("SpyBotPlayModeProbe").AddComponent<SpyBotPlayModeProbe>();
+    }
+
+    private static void MonitorIdentificationPlayValidation()
+    {
+        if (!EditorApplication.isPlaying)
+            return;
+
+        if (Object.FindAnyObjectByType<GameManager>() == null ||
+            Object.FindAnyObjectByType<OrganizerController>() == null ||
+            Object.FindAnyObjectByType<SpyController>() == null)
+            return;
+        EditorApplication.update -= MonitorIdentificationPlayValidation;
+        SessionState.SetBool(IdentificationPlayValidationKey, false);
+        new GameObject("SuspectIdentificationPlayModeProbe")
+            .AddComponent<SuspectIdentificationPlayModeProbe>();
     }
 
     private static void ValidateInteractiveOrganizerRoom()
